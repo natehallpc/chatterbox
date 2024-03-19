@@ -1,14 +1,21 @@
 import paho.mqtt.client as mqtt
 import json
+import ssl
+
+is_connected = False
 
 # Define callback functions
 
-# Successfully connected to broker
+# Connected to broker
 def on_connect(client, userdata, flags, reason_code, properties):
-    print("Successfully connected to broker.")
-    raise SystemExit
+    is_connected = reason_code == 'Success'
+    if is_connected:
+        print("Successfully connected to broker.")
+    else:
+        print(f"Broker connection unsuccessful. Reason code: {reason_code}")
+    #raise SystemExit
 
-# Failed to connect to broker
+# Connection timeout
 def on_connect_fail(client, userdata):
     print("Failed to connect to broker.")
     raise SystemExit
@@ -37,6 +44,18 @@ broker_url = settings.get('broker_url', None)
 if not broker_url:
     print("ERROR: broker_url not found in configuration file.")
     raise SystemExit
+
+cert_file = settings.get('cert_file', None)
+if not cert_file:
+    print("ERROR: cert_file not found in configuration file.")
+    raise SystemExit
+
+key_file = settings.get('key_file', None)
+if not key_file:
+    print("ERROR: key_file not found in configuration file.")
+    raise SystemExit
+
+key_file_password = settings.get('key_password', None)
 
 ca_cert_file = settings.get('ca_cert_file', None)
 if not ca_cert_file:
@@ -67,10 +86,10 @@ mqtt_client.on_connect = on_connect
 mqtt_client.on_message = on_message
 mqtt_client.on_log = on_log
 mqtt_client.on_connect_fail = on_connect_fail
-mqtt_client.tls_set(ca_certs=ca_cert_file)
+mqtt_client.tls_set(ca_certs=ca_cert_file, certfile=cert_file, keyfile=key_file, keyfile_password=key_file_password, tls_version=ssl.PROTOCOL_TLSv1_2)
 mqtt_client.username_pw_set(username=username, password=password)
 
-# Attempt to connect
+# Attempt to connect for a maximum of 60 seconds
 mqtt_client.connect(broker_url, 8883, 60)
 
 mqtt_client.loop_forever()
