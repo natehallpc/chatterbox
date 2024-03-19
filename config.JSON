@@ -1,0 +1,10 @@
+{
+    "broker_url": "mqtt.example.com",
+    "client_id": "client_id",
+    "login_username": "username",
+    "login_password": "password",
+    "ca_cert_file": "/path/to/ca/cert/file",
+    "tag_topic_mappings": {
+        "plcnext_tag_path": "mqtt_topic_path"
+    }
+}
