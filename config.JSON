@@ -9,5 +9,7 @@
     "ca_cert_file": "/path/to/ca/cert/file",
     "tag_topic_mappings": {
         "plcnext_tag_path": "mqtt_topic_path"
-    }
+    },
+    "seconds_between_publications": 10,
+    "log_file": "/var/log/plcnext-mqtt.log"
 }

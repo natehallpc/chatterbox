@@ -1,24 +1,43 @@
 import paho.mqtt.client as mqtt
 import json
 import ssl
+import time
+import logging
 
 is_connected = False
+
+# Define helper functions
+
+def publish_tags(mappings):
+    if is_connected:
+        logger.info(f'Publishing tags: \n{mappings}')
+
 
 # Define callback functions
 
 # Connected to broker
 def on_connect(client, userdata, flags, reason_code, properties):
+    # reason_code takes the form of an MQTT-v5.0-specified name
+    global is_connected 
     is_connected = reason_code == 'Success'
     if is_connected:
-        print("Successfully connected to broker.")
+        logger.info("Successfully connected to broker.")
     else:
-        print(f"Broker connection unsuccessful. Reason code: {reason_code}")
-    #raise SystemExit
+        logger.error(f"Broker connection unsuccessful. Reason code: {reason_code}")
 
 # Connection timeout
 def on_connect_fail(client, userdata):
-    print("Failed to connect to broker.")
+    global is_connected
+    is_connected = False
+    logger.error("Failed to connect to broker.")
+    #TODO: implement reconnection procedure
     raise SystemExit
+
+
+
+def on_disconnect(client, userdata, disconnect_flags, reason_code, properties):
+    #TODO: implement reconnection procedure
+    pass
 
 # Received update from broker on subscribed topic
 def on_message(client, userdata, message):
@@ -26,7 +45,7 @@ def on_message(client, userdata, message):
 
 # Log information has become available
 def on_log(client, userdata, level, buf):
-    print("log: ", buf)
+    logger.info(buf)
 
 # Read JSON configuration file
 try:
@@ -77,6 +96,24 @@ if not password:
     print("ERROR: login_password not found in configuration file.")  
     raise SystemExit
 
+mappings = settings.get('tag_topic_mappings', None)
+if not mappings:
+    print("ERROR: tag_topic_mappings not found in configuration file.")  
+    raise SystemExit
+
+time_between_publications = settings.get('time_between_publications', 10)
+if type(time_between_publications) is not int:
+    print("ERROR: time_between_publications must be an integer.")  
+    raise SystemExit
+
+log_file_name = settings.get('log_file', '/var/log/plcnext-mqtt.log')
+logger = logging.getLogger(__name__)
+try:
+    logging.basicConfig(filename=log_file_name, encoding='utf-8', level=logging.DEBUG)
+except OSError:
+    print("ERROR: invalid log file. Make sure the specified directory exists and that you have permission to write to it.")
+    raise SystemExit
+
 
 # Connect to broker
     
@@ -85,11 +122,15 @@ mqtt_client = mqtt.Client(callback_api_version=mqtt.CallbackAPIVersion.VERSION2,
 mqtt_client.on_connect = on_connect
 mqtt_client.on_message = on_message
 mqtt_client.on_log = on_log
+mqtt_client.on_disconnect = on_disconnect
 mqtt_client.on_connect_fail = on_connect_fail
 mqtt_client.tls_set(ca_certs=ca_cert_file, certfile=cert_file, keyfile=key_file, keyfile_password=key_file_password, tls_version=ssl.PROTOCOL_TLSv1_2)
 mqtt_client.username_pw_set(username=username, password=password)
 
-# Attempt to connect for a maximum of 60 seconds
+# Attempt to connect with a timeout of 60 seconds
 mqtt_client.connect(broker_url, 8883, 60)
 
-mqtt_client.loop_forever()
+mqtt_client.loop_start()
+while True:
+    publish_tags(mappings)
+    time.sleep(time_between_publications)
