@@ -17,7 +17,7 @@ def publish_tags(client: mqtt.Client, mappings: dict, qos: int, retain: bool):
         new_val = random.uniform(0, 1) # For testing purposes, don't publish actual tag value
         topic = mappings[tag]
         logger.info(f'Publishing value {new_val} to topic {topic}')
-        client.publish(topic=topic, payload=new_val, qos=0, retain=False, properties=None)
+        client.publish(topic=topic, payload=new_val, qos=qos, retain=retain, properties=None)
 
 # CALLBACK: Connected to broker
 def on_connect(client, userdata, flags, reason_code, properties):
