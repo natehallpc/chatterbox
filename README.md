@@ -1,8 +1,8 @@
-# plcnext-mqtt
+# chatterbox
 Service that publishes PLCnext tags to MQTT topics.
 
 ## Notes
-- As of this commit, the tool attempts to connect to the broker but does not publish or subscribe to any topics. Once a connection is successfully established, it will simply log tag-topic mappings at the specified publish frequency.
+- As of this commit, the tool publishes to the specified topics, but ignores PLCnext tags and instead uses test values (between 0 and 1, inclusive).
 
 ## Usage
 
@@ -10,10 +10,15 @@ Service that publishes PLCnext tags to MQTT topics.
 You can find installation instructions below.
 
 ### Configuration
-- Settings are provided via the config.JSON file. The provided config.JSON file is a template listing all possible arguments.
+- Settings are provided via the `config.JSON` file. The provided file is a template listing all possible arguments.
 - Arguments not listed in the template will be ignored.
-- All arguments in the template are required except key_file_password and seconds_between_publications. If the key file is password protected and key_file_password is not provided, you will be promted to enter it on the command line. If seconds_between_publications is not provided, tags will be published every 10 seconds.
+- All arguments in the template are required except `key_file_password` and those specified in the defaults section below. If the key file is password protected and `key_file_password` is not provided, you will be promted to enter it on the command line.
 
+### Defaults
+- `log_file`: `/var/log/chatterbox.log`
+- `seconds_between_publications`: `10`
+- `publish_qos`: `0`
+- `retain_topics`: `false`
 
 ## Installation
 
@@ -36,7 +41,7 @@ Several steps must be taken to ensure that this program is ran at startup and re
 
 4. As `root`, use a tool like SFTP or SCP to transfer files to the PLC. 
     
-    Place them in `/opt/plcnext/plcnext-mqtt`. You will need to create the `plcnext-mqtt` directory and you can call it whatever you'd like.
+    Place them in `/opt/plcnext/chatterbox`. You will need to create the `chatterbox` directory.
      
 
     Necessary files are:
@@ -50,6 +55,6 @@ Several steps must be taken to ensure that this program is ran at startup and re
 
 6. Change `main.py` permissions to allow execution: 
 
-    `chmod +x /opt/plcnext/plcnext-mqtt/main.py`
+    `chmod +x /opt/plcnext/chatterbox/main.py`
 
 7. 

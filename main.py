@@ -3,15 +3,21 @@ import json
 import ssl
 import time
 import logging
+import random  # Solely for testing
 
 ####################################################
 # Define helper functions & callbacks
 ####################################################
 
 # Uses the provided client to publish PLCnext tags to their respectively mapped MQTT topics
-def publish_tags(client: mqtt.Client, mappings: dict):
-    if client.is_connected():
-        logger.info(f'Publishing tags: \n{mappings}')
+def publish_tags(client: mqtt.Client, mappings: dict, qos: int, retain: bool):
+    if not client.is_connected():
+        return
+    for tag in mappings:
+        new_val = random.uniform(0, 1) # For testing purposes, don't publish actual tag value
+        topic = mappings[tag]
+        logger.info(f'Publishing value {new_val} to topic {topic}')
+        client.publish(topic=topic, payload=new_val, qos=0, retain=False, properties=None)
 
 # CALLBACK: Connected to broker
 def on_connect(client, userdata, flags, reason_code, properties):
@@ -98,7 +104,11 @@ time_between_publications = settings.get('time_between_publications', 10)
 if type(time_between_publications) is not int:
     print("ERROR: time_between_publications must be an integer.")  
     raise SystemExit
-log_file_name = settings.get('log_file', '/var/log/plcnext-mqtt.log')
+log_file_name = settings.get('log_file', '/var/log/chatterbox.log')
+publish_qos = settings.get('publish_qos', 0)
+retain_topics = settings.get('retain_topics', False)
+
+# Initialize logger
 logger = logging.getLogger(__name__)
 try:
     logging.basicConfig(filename=log_file_name, encoding='utf-8', level=logging.DEBUG)
@@ -127,5 +137,5 @@ mqtt_client.connect(broker_url, 8883, 60)
 
 mqtt_client.loop_start()
 while True:
-    publish_tags(mqtt_client, mappings)
+    publish_tags(client=mqtt_client, mappings=mappings, qos=publish_qos, retain=retain_topics)
     time.sleep(time_between_publications)
