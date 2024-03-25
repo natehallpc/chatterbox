@@ -14,10 +14,13 @@ def publish_tags(client: mqtt.Client, mappings: dict, qos: int, retain: bool):
     if not client.is_connected():
         return
     for tag in mappings:
-        new_val = random.uniform(0, 1) # For testing purposes, don't publish actual tag value
+        tag_value = random.uniform(0, 1) # For testing purposes, don't publish actual tag value
         topic = mappings[tag]
-        logger.info(f'Publishing value {new_val} to topic {topic}')
-        client.publish(topic=topic, payload=new_val, qos=qos, retain=retain, properties=None)
+        logger.info(f"Publishing {tag}'s value of {tag_value} to topic {topic}")
+        try:
+            client.publish(topic=topic, payload=tag_value, qos=qos, retain=retain, properties=None)
+        except ValueError:
+            logger.error(f"Could not publish tag. Ensure that the topic is valid, the QOS is 0, 1, or 2, and the tag value is less than 268435455 bytes.")
 
 # CALLBACK: Connected to broker
 def on_connect(client, userdata, flags, reason_code, properties):
