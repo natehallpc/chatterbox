@@ -1,5 +1,5 @@
 # chatterbox
-Service that publishes PLCnext tags to MQTT topics.
+Service that periodically publishes PLCnext tags to MQTT topics.
 
 ## Notes
 - As of this commit, the tool publishes to the specified topics, but ignores PLCnext tags and instead uses test values (between 0 and 1, inclusive).
