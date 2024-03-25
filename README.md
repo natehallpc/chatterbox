@@ -1,13 +1,13 @@
 # chatterbox
 Service that periodically publishes PLCnext tags to MQTT topics.
 
-## Notes
-- As of this commit, the tool publishes to the specified topics, but ignores PLCnext tags and instead uses test values (between 0 and 1, inclusive).
-
 ## Usage
 
-### Installation
-You can find installation instructions below.
+### Overview
+
+When installed as directed, this script runs at startup and respawns if killed. It reads tag values from the PLCnext REST API and publishes them to topics on an MQTT broker with configurable frequency.
+
+Configuration instructions can be found below, and installation instructions are in their own section further down.
 
 ### Configuration
 - Settings are provided via the `config.JSON` file. The provided file is a template listing all possible arguments.
@@ -24,7 +24,7 @@ You can find installation instructions below.
 
 NOTE: Installation steps below are incomplete and should not be used yet.
 
-Several steps must be taken to ensure that this program is ran at startup and restarted after any unexpected failure.
+Several steps must be taken to ensure that this program is ran at startup and respawned after any unexpected failure.
 
 1. Connect to PLCnext as `admin` user via SSH.
 
@@ -57,4 +57,11 @@ Several steps must be taken to ensure that this program is ran at startup and re
 
     `chmod +x /opt/plcnext/chatterbox/main.py`
 
-7. 
+...
+
+
+
+    ```
+    python3 -m pip install paho-mqtt
+    python3 -m pip install pyPLCn
+    ```

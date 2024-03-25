@@ -3,7 +3,7 @@ import json
 import ssl
 import time
 import logging
-import random  # Solely for testing
+import pyPLCn
 
 ####################################################
 # Define helper functions & callbacks
@@ -11,10 +11,12 @@ import random  # Solely for testing
 
 # Uses the provided client to publish PLCnext tags to their respectively mapped MQTT topics
 def publish_tags(client: mqtt.Client, mappings: dict, qos: int, retain: bool):
-    if not client.is_connected():
+    if not (client.is_connected() and plc.is_connected()):
+        # Can't read data without PLC connection, can't write it without MQTT connection.
+        # Both connections are configured to restore themselves, but don't attempt any updates before they do.
         return
     for tag in mappings:
-        tag_value = random.uniform(0, 1) # For testing purposes, don't publish actual tag value
+        tag_value = plc.get_var(tag)
         topic = mappings[tag]
         logger.info(f"Publishing {tag}'s value of {tag_value} to topic {topic}")
         try:
@@ -91,13 +93,21 @@ client_id = settings.get('client_id', None)
 if not client_id:
     print("ERROR: client_id not found in configuration file.")  
     raise SystemExit
-username = settings.get('login_username', None)
-if not username:
-    print("ERROR: login_username not found in configuration file.")  
+mqtt_username = settings.get('mqtt_username', None)
+if not mqtt_username:
+    print("ERROR: mqtt_username not found in configuration file.")  
     raise SystemExit
-password = settings.get('login_password', None)
-if not password:
-    print("ERROR: login_password not found in configuration file.")  
+mqtt_password = settings.get('mqtt_password', None)
+if not mqtt_password:
+    print("ERROR: mqtt_password not found in configuration file.")  
+    raise SystemExit
+plc_username = settings.get('plc_username', None)
+if not plc_username:
+    print("ERROR: plc_username not found in configuration file.")  
+    raise SystemExit
+plc_password = settings.get('plc_password', None)
+if not plc_password:
+    print("ERROR: plc_password not found in configuration file.")  
     raise SystemExit
 mappings = settings.get('tag_topic_mappings', None)
 if not mappings:
@@ -121,7 +131,7 @@ except OSError:
 
 
 ####################################################
-# Connect to broker and start the indefinite loop
+# Connect to MQTT broker
 ####################################################
     
 # Initialize client and register its callbacks
@@ -132,11 +142,24 @@ mqtt_client.on_log = on_log
 mqtt_client.on_disconnect = on_disconnect
 mqtt_client.on_connect_fail = on_connect_fail
 mqtt_client.tls_set(ca_certs=ca_cert_file, certfile=cert_file, keyfile=key_file, keyfile_password=key_file_password, tls_version=ssl.PROTOCOL_TLSv1_2)
-mqtt_client.username_pw_set(username=username, password=password)
+mqtt_client.username_pw_set(username=mqtt_username, password=mqtt_password)
 
 # Attempt to connect with a timeout of 60 seconds
 logger.info(f"Attempting to connect to {broker_url}")
 mqtt_client.connect(broker_url, 8883, 60)
+
+
+####################################################
+# Connect to PLCnext resource
+####################################################
+plc = pyPLCn()
+plc.set_var_names(mappings.keys)
+plc.connect('localhost', login=plc_username, password=plc_password, poll_time=5000)
+
+
+####################################################
+# Publish tags to topics 'til the sun goes dark.
+####################################################
 
 mqtt_client.loop_start()
 while True:
