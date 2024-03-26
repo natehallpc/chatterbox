@@ -3,20 +3,20 @@ import json
 import ssl
 import time
 import logging
-import pyPLCn
+import sys
+from PyPlcnextRsc import Device, GUISupplierExample
+from PyPlcnextRsc.Arp.Plc.Gds.Services import IDataAccessService
 
 ####################################################
 # Define helper functions & callbacks
 ####################################################
 
 # Uses the provided client to publish PLCnext tags to their respectively mapped MQTT topics
-def publish_tags(client: mqtt.Client, mappings: dict, qos: int, retain: bool):
-    if not (client.is_connected() and plc.is_connected()):
-        # Can't read data without PLC connection, can't write it without MQTT connection.
-        # Both connections are configured to restore themselves, but don't attempt any updates before they do.
+def publish_tags(data_service: IDataAccessService, client: mqtt.Client, mappings: dict, qos: int, retain: bool):
+    if not client.is_connected():
         return
     for tag in mappings:
-        tag_value = plc.get_var(tag)
+        tag_value = data_service.ReadSingle(tag).Value.GetValue()
         topic = mappings[tag]
         logger.info(f"Publishing {tag}'s value of {tag_value} to topic {topic}")
         try:
@@ -47,7 +47,7 @@ def on_connect_fail(client, userdata):
 def on_disconnect(client, userdata, disconnect_flags, reason_code, properties):
     broker_url = client.host
     logger.error(f"The connection to {broker_url} was broken. Attempting to reconnect.")
-    client.connect(broker_url, 8883, 60)
+    client.reconnect()
 
 # CALLBACK: Received update from broker on subscribed topic
 def on_message(client, userdata, message):
@@ -72,6 +72,7 @@ except OSError:
 settings = json.load(config_file)
 
 # Parse config settings
+plc_address = settings.get('plc_address', 'localhost')
 broker_url = settings.get('broker_url', None)
 if not broker_url:
     print("ERROR: broker_url not found in configuration file.")
@@ -113,7 +114,7 @@ mappings = settings.get('tag_topic_mappings', None)
 if not mappings:
     print("ERROR: tag_topic_mappings not found in configuration file.")  
     raise SystemExit
-time_between_publications = settings.get('time_between_publications', 10)
+time_between_publications = settings.get('seconds_between_publications', 10)
 if type(time_between_publications) is not int:
     print("ERROR: time_between_publications must be an integer.")  
     raise SystemExit
@@ -150,18 +151,18 @@ mqtt_client.connect(broker_url, 8883, 60)
 
 
 ####################################################
-# Connect to PLCnext resource
+# Connect to PLCnext resource and publish tags to
+# topics 'til the sun goes dark.
 ####################################################
-plc = pyPLCn()
-plc.set_var_names(mappings.keys)
-plc.connect('localhost', login=plc_username, password=plc_password, poll_time=5000)
-
-
-####################################################
-# Publish tags to topics 'til the sun goes dark.
-####################################################
-
-mqtt_client.loop_start()
+secureInfoSupplier = lambda:(plc_username, plc_password)
 while True:
-    publish_tags(client=mqtt_client, mappings=mappings, qos=publish_qos, retain=retain_topics)
-    time.sleep(time_between_publications)
+    with Device('192.168.1.10', secureInfoSupplier=secureInfoSupplier) as device:
+        data_access_service = IDataAccessService(device)
+        mqtt_client.loop_start()
+        while True:
+            publish_tags(data_service=data_access_service, client=mqtt_client, mappings=mappings, qos=publish_qos, retain=retain_topics)
+            time.sleep(time_between_publications)
+    mqtt_client.loop_stop()
+
+
+

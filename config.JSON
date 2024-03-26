@@ -1,4 +1,5 @@
 {
+    "plc_address": "localhost",
     "broker_url": "mqtt.example.com",
     "client_id": "client_id",
     "mqtt_username": "username",
