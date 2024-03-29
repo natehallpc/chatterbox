@@ -15,6 +15,7 @@
     },
     "seconds_between_publications": 10,
     "log_file": "/var/log/chatterbox.log",
+    "log_verbose": false,
     "publish_qos": 0,
     "retain_topics": false
 }

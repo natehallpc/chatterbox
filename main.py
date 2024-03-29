@@ -18,7 +18,7 @@ def publish_tags(data_service: IDataAccessService, client: mqtt.Client, mappings
     for tag in mappings:
         tag_value = data_service.ReadSingle(tag).Value.GetValue()
         topic = mappings[tag]
-        logger.info(f"Publishing {tag}'s value of {tag_value} to topic {topic}")
+        logger.debug(f"Publishing {tag}'s value of {tag_value} to topic {topic}")
         try:
             client.publish(topic=topic, payload=tag_value, qos=qos, retain=retain, properties=None)
         except ValueError:
@@ -55,7 +55,7 @@ def on_message(client, userdata, message):
 
 # CALLBACK: Log information has become available
 def on_log(client, userdata, level, buf):
-    logger.info(buf)
+    logger.debug(buf)
 
 
 ####################################################
@@ -119,13 +119,14 @@ if type(time_between_publications) is not int:
     print("ERROR: time_between_publications must be an integer.")  
     raise SystemExit
 log_file_name = settings.get('log_file', '/var/log/chatterbox.log')
-publish_qos = settings.get('publish_qos', 0)
+log_verbose: bool = settings.get('log_verbose', False)
 retain_topics = settings.get('retain_topics', False)
 
 # Initialize logger
 logger = logging.getLogger(__name__)
 try:
-    logging.basicConfig(filename=log_file_name, encoding='utf-8', level=logging.DEBUG)
+    log_level = logging.DEBUG if log_verbose else logging.INFO
+    logging.basicConfig(filename=log_file_name, encoding='utf-8', level=log_level)
 except OSError:
     print("ERROR: invalid log file. Make sure the specified directory exists and that you have permission to write to it.")
     raise SystemExit
