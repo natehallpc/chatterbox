@@ -57,9 +57,9 @@ def on_log(client, userdata, level, buf):
     
 # Read JSON configuration file
 try:
-    config_file = open('config.json')
+    config_file = open('/opt/plcnext/chatterbox/config.json')
 except OSError:
-    print("ERROR: config.JSON not found.")
+    print("ERROR: config.json not found.")
     raise SystemExit
 
 settings = json.load(config_file)
@@ -98,6 +98,9 @@ if not (plc_password := settings.get('plc_password', None)):
     raise SystemExit
 if not (mappings := settings.get('tag_topic_mappings', None)):
     print("ERROR: tag_topic_mappings not found in configuration file.")  
+    raise SystemExit
+if type(mappings) is not dict:
+    print("ERROR: tag_topic_mappings is not a properly formatted dictionary.")
     raise SystemExit
 if type((time_between_publications := settings.get('seconds_between_publications', 10))) is not int:
     print("ERROR: time_between_publications must be an integer.")  
