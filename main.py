@@ -29,25 +29,18 @@ def on_connect(client, userdata, flags, reason_code, properties):
     # reason_code takes the form of an MQTT-v5.0-specified name
     broker_url = client.host
     if client.is_connected():
-        logger.info(f"Successfully connected to {broker_url}")
+        logger.info(f"Successfully connected to {broker_url}.")
     else:
-        logger.error(f"Broker connection unsuccessful. Reason code: {reason_code}")
-        logger.info(f"Reattempting to connect to {broker_url}")
-        client.connect(broker_url, 8883, 60)
+        logger.error(f"Broker connection unsuccessful. Reason code: {reason_code}.")
 
 # CALLBACK: Connection timeout
 def on_connect_fail(client, userdata):
-    broker_url = client.host
-    logger.error("The broker did not respond in time. Waiting 60s to try again.")
-    time.sleep(60)
-    logger.info(f"Reattempting to connect to {broker_url}")
-    client.connect(broker_url, 8883, 60)
+    logger.error(f"Failed to connect to {broker_url}.")
 
 # CALLBACK: Broker connection severed
 def on_disconnect(client, userdata, disconnect_flags, reason_code, properties):
     broker_url = client.host
-    logger.error(f"The connection to {broker_url} was broken. Attempting to reconnect.")
-    client.reconnect()
+    logger.error(f"The connection to {broker_url} was broken. Will now attempt to reconnect until successful.")
 
 # CALLBACK: Received update from broker on subscribed topic
 def on_message(client, userdata, message):
@@ -146,24 +139,32 @@ mqtt_client.on_connect_fail = on_connect_fail
 mqtt_client.tls_set(ca_certs=ca_cert_file, certfile=cert_file, keyfile=key_file, keyfile_password=key_file_password, tls_version=ssl.PROTOCOL_TLSv1_2)
 mqtt_client.username_pw_set(username=mqtt_username, password=mqtt_password)
 
-# Attempt to connect with a timeout of 60 seconds
-logger.info(f"Attempting to connect to {broker_url}")
-mqtt_client.connect(broker_url, 8883, 60)
+# Attempt to connect to the broker. Any immediate errors, such as connection refused or
+# timed out, will be caught and logged. If the connection fails later, loop_start() 
+# ensures the connection will be reattempted until successful. If the connection is lost
+# later, it will be reestablished automatically.
+try:
+    logger.info(f"Attempting to connect to {broker_url}")
+    mqtt_client.connect(host=broker_url, port=8883)
+except Exception as e:
+    logger.error(e)
+    logger.info("Connection failed due to the above error. Waiting 60s to try again.")
+mqtt_client.loop_start()
 
 
 ####################################################
-# Connect to PLCnext resource and publish tags to
-# topics 'til the sun goes dark.
+# Connect to PLCnext RSC interface and publish tags
+# to topics 'til the sun goes dark.
 ####################################################
 secureInfoSupplier = lambda:(plc_username, plc_password)
 while True:
-    with Device('192.168.1.10', secureInfoSupplier=secureInfoSupplier) as device:
-        data_access_service = IDataAccessService(device)
-        mqtt_client.loop_start()
-        while True:
-            publish_tags(data_service=data_access_service, client=mqtt_client, mappings=mappings, qos=publish_qos, retain=retain_topics)
-            time.sleep(time_between_publications)
-    mqtt_client.loop_stop()
-
-
-
+    try:
+        print("entering with")
+        with Device(plc_address, secureInfoSupplier=secureInfoSupplier) as device:
+            data_access_service = IDataAccessService(device)
+            while True:
+                publish_tags(data_service=data_access_service, client=mqtt_client, mappings=mappings, qos=publish_qos, retain=retain_topics)
+                time.sleep(time_between_publications)
+    except Exception as e:
+        logger.error(e)
+        time.sleep(20)
