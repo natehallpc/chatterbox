@@ -156,7 +156,6 @@ mqtt_client.loop_start()
 secureInfoSupplier = lambda:(plc_username, plc_password)
 while True:
     try:
-        print("entering with")
         with Device(plc_address, secureInfoSupplier=secureInfoSupplier) as device:
             data_access_service = IDataAccessService(device)
             while True:
