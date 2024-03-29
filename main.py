@@ -22,7 +22,7 @@ def publish_tags(data_service: IDataAccessService, client: mqtt.Client, mappings
         try:
             client.publish(topic=topic, payload=tag_value, qos=qos, retain=retain, properties=None)
         except ValueError:
-            logger.error(f"Could not publish tag. Ensure that the topic is valid, the QOS is 0, 1, or 2, and the tag value is less than 268435455 bytes.")
+            logger.error(f"Could not publish tag. Ensure that the topic is valid and the tag value is less than 268435455 bytes.")
 
 # CALLBACK: Connected to broker
 def on_connect(client, userdata, flags, reason_code, properties):
@@ -57,62 +57,56 @@ def on_log(client, userdata, level, buf):
     
 # Read JSON configuration file
 try:
-    config_file = open('config.JSON')
+    config_file = open('config.json')
 except OSError:
     print("ERROR: config.JSON not found.")
     raise SystemExit
 
 settings = json.load(config_file)
 
-# Parse config settings
+# Parse config settings. Use walrus operator (:=) to assign variables
+# while simultaneously performing error checks. Use None default for
+# dictionary accesses rather than catching exceptions for missing values.
 plc_address = settings.get('plc_address', 'localhost')
-broker_url = settings.get('broker_url', None)
-if not broker_url:
+if not (broker_url := settings.get('broker_url', None)):
     print("ERROR: broker_url not found in configuration file.")
     raise SystemExit
-cert_file = settings.get('cert_file', None)
-if not cert_file:
+if not (cert_file := settings.get('cert_file', None)):
     print("ERROR: cert_file not found in configuration file.")
     raise SystemExit
-key_file = settings.get('key_file', None)
-if not key_file:
+if not (key_file := settings.get('key_file', None)):
     print("ERROR: key_file not found in configuration file.")
     raise SystemExit
 key_file_password = settings.get('key_password', None)
-ca_cert_file = settings.get('ca_cert_file', None)
-if not ca_cert_file:
+if not (ca_cert_file := settings.get('ca_cert_file', None)):
     print("ERROR: ca_cert_file not found in configuration file.")
     raise SystemExit
-client_id = settings.get('client_id', None)
-if not client_id:
+if not (client_id := settings.get('client_id', None)):
     print("ERROR: client_id not found in configuration file.")  
     raise SystemExit
-mqtt_username = settings.get('mqtt_username', None)
-if not mqtt_username:
+if not (mqtt_username := settings.get('mqtt_username', None)):
     print("ERROR: mqtt_username not found in configuration file.")  
     raise SystemExit
-mqtt_password = settings.get('mqtt_password', None)
-if not mqtt_password:
+if not (mqtt_password := settings.get('mqtt_password', None)):
     print("ERROR: mqtt_password not found in configuration file.")  
     raise SystemExit
-plc_username = settings.get('plc_username', None)
-if not plc_username:
+if not (plc_username := settings.get('plc_username', None)):
     print("ERROR: plc_username not found in configuration file.")  
     raise SystemExit
-plc_password = settings.get('plc_password', None)
-if not plc_password:
+if not (plc_password := settings.get('plc_password', None)):
     print("ERROR: plc_password not found in configuration file.")  
     raise SystemExit
-mappings = settings.get('tag_topic_mappings', None)
-if not mappings:
+if not (mappings := settings.get('tag_topic_mappings', None)):
     print("ERROR: tag_topic_mappings not found in configuration file.")  
     raise SystemExit
-time_between_publications = settings.get('seconds_between_publications', 10)
-if type(time_between_publications) is not int:
+if type((time_between_publications := settings.get('seconds_between_publications', 10))) is not int:
     print("ERROR: time_between_publications must be an integer.")  
     raise SystemExit
 log_file_name = settings.get('log_file', '/var/log/chatterbox.log')
 log_verbose: bool = settings.get('log_verbose', False)
+if (publish_qos := settings.get('publish_qos', 0)) not in [0, 1, 2]:
+    print("ERROR: publish_qos must be an integer. Possible options are 0, 1, and 2.")
+    raise SystemExit
 retain_topics = settings.get('retain_topics', False)
 
 # Initialize logger
