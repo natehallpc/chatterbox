@@ -1,17 +1,17 @@
 #!/bin/sh
 ### BEGIN INIT INFO
-# Provides:          chatterboxd
+# Provides:          chatterbox
 # Required-Start:    $local_fs $remote_fs $syslog $network $named $portmap $time
 # Default-Start:     2 3 4 5
 # Default-Stop:      0 1 6
-# Short-Description: run chatterbox daemon
+# Short-Description: run chatterbox
 # Description:       chatterbox is a Python program that interconnects the PLCnext
 #                                        runtime environment with a remote MQTT broker.
 ### END INIT INFO
 
-DIR=/opt/plcnext/chatterbox
+DIR=/etc/chatterbox
 DAEMON=$DIR/chatterbox.py
-DAEMON_NAME=chatterboxd
+DAEMON_NAME=chatterbox
 DAEMON_OPTS=""
 
 # Run as root because other users will not have access to PLCnext's persistent storage areas.
@@ -23,9 +23,9 @@ PIDFILE=/var/run/$DAEMON_NAME.pid
 do_start () {
     pid=$(pgrep -f chatterbox.py 2>&1)
     if [ $? -eq 0 ] ; then
-        echo "chatterboxd is already running."
+        echo "chatterbox is already running."
     else
-        echo -n "Starting chatterboxd: "
+        echo -n "Starting chatterbox: "
         start-stop-daemon --start --quiet --background --pidfile $PIDFILE --make-pidfile --chuid $DAEMON_USER --startas /usr/bin/python3 -- $DAEMON
             RETVAL=$?
         if [ $RETVAL -eq 0 ] ; then
@@ -39,9 +39,9 @@ do_start () {
 do_stop () {
     pid=$(pgrep -f chatterbox.py 2>&1)
     if [ $? -ne 0 ] ; then
-            echo "chatterboxd is not running."
+            echo "chatterbox is not running."
     else
-            echo -n "Stopping chatterboxd: "
+            echo -n "Stopping chatterbox: "
             start-stop-daemon --stop --quiet --pid $pid
             RETVAL=$?
             if [ $RETVAL -eq 0 ] ; then

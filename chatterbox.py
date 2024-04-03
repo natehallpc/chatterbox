@@ -58,7 +58,7 @@ def on_log(client, userdata, level, buf):
     
 # Read JSON configuration file
 try:
-    config_file = open('/etc/chatterbox.d/config.json')
+    config_file = open('/etc/chatterbox/config.json')
 except:
     print("ERROR: config.json not found.")
     raise SystemExit
@@ -134,14 +134,17 @@ logging.info("chatterbox was started successfully.")
 ####################################################
     
 # Initialize client and register its callbacks
-mqtt_client = mqtt.Client(callback_api_version=mqtt.CallbackAPIVersion.VERSION2, client_id=client_id)
-mqtt_client.on_connect = on_connect
-mqtt_client.on_message = on_message
-mqtt_client.on_log = on_log
-mqtt_client.on_disconnect = on_disconnect
-mqtt_client.on_connect_fail = on_connect_fail
-mqtt_client.tls_set(ca_certs=ca_cert_file, certfile=cert_file, keyfile=key_file, keyfile_password=key_file_password, tls_version=ssl.PROTOCOL_TLSv1_2)
-mqtt_client.username_pw_set(username=mqtt_username, password=mqtt_password)
+try:
+    mqtt_client = mqtt.Client(callback_api_version=mqtt.CallbackAPIVersion.VERSION2, client_id=client_id)
+    mqtt_client.on_connect = on_connect
+    mqtt_client.on_message = on_message
+    mqtt_client.on_log = on_log
+    mqtt_client.on_disconnect = on_disconnect
+    mqtt_client.on_connect_fail = on_connect_fail
+    mqtt_client.tls_set(ca_certs=ca_cert_file, certfile=cert_file, keyfile=key_file, keyfile_password=key_file_password, tls_version=ssl.PROTOCOL_TLSv1_2)
+    mqtt_client.username_pw_set(username=mqtt_username, password=mqtt_password)
+except Exception as e:
+    logging.error(e)
 
 # Attempt to connect to the broker. Any immediate errors, such as connection refused or
 # timed out, will be caught and logged. If the connection fails later, loop_start() 

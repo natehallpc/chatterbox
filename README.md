@@ -10,7 +10,7 @@ When installed as directed, this tool runs at startup and includes optional cron
 Configuration instructions can be found below, and installation instructions are in their own section further down.
 
 ### Configuration
-- Ensure that variables to be read from PLCnext are not declared as 'local'; locals won't be accessible.
+- Ensure that variables to be read from PLCnext are not declared with an appropriate usage scope. For example, variables with usage 'local' won't be accessible.
 - Settings are provided via the `config.json` file. The provided file is a template listing all possible arguments.
 - Arguments not listed in the template will be ignored.
 - All arguments in the template are required except  those specified in the defaults section below. If the key file is password protected and `key_file_password` is not provided, you will be promted to enter it on the command line.
@@ -50,9 +50,9 @@ Before following these instructions, **be sure your PLCnext controller has inter
 
 4. As `root`, use a tool like SFTP or SCP to transfer files to the PLC. 
 
-    Place `chatterboxd` in `/etc/init.d/`
+    Place `chatterbox` in `/etc/init.d/`
     
-    Place remaining files in `/etc/chatterbox.d/`. You will need to create the `chatterbox.d` directory. Make sure `chatterbox.py` and `config.json` are in this exact directory, and not a subdirectory.
+    Place remaining files in `/etc/chatterbox/`. You will need to create the `chatterbox` directory. Make sure `chatterbox.py` and `config.json` are in this exact directory, and not a subdirectory.
      
 
     Necessary files are:
@@ -64,11 +64,11 @@ Before following these instructions, **be sure your PLCnext controller has inter
 
 5. SSH into the controller as `root` or log in as another user and run `su`
 
-6. Change `chatterbox.py`  and `chatterboxd` permissions to allow execution: 
+6. Change `chatterbox.py`  and `chatterbox` permissions to allow execution: 
 
     ```
-    chmod +x /etc/chatterbox.d/chatterbox.py
-    chmod +x /etc/init.d/chatterboxd
+    chmod +x /etc/chatterbox/chatterbox.py
+    chmod +x /etc/init.d/chatterbox
     ```
 
 7. Install `pip`:
@@ -89,11 +89,16 @@ Before following these instructions, **be sure your PLCnext controller has inter
 
     ```
     cd /etc/init.d/
-    update-rc.d chatterboxd defaults
+    update-rc.d chatterbox defaults
     ```
 
 10. Start the service!
 
     ```
-    service chatterboxd start
+    service chatterbox start
     ```
+
+## Troubleshooting
+
+- Issue: my PLCnext variables have values, but `None` is being published.
+    - Solution: this means the variable was not found. Double check your tag prefix, variable name, and the variable's usage scope within PLCnext Engineer.
