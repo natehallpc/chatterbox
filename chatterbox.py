@@ -7,6 +7,7 @@ import sys
 from PyPlcnextRsc import Device, GUISupplierExample
 from PyPlcnextRsc.Arp.Plc.Gds.Services import IDataAccessService
 
+
 ####################################################
 # Define helper functions & callbacks
 ####################################################
@@ -19,7 +20,7 @@ def publish_tags(data_service: IDataAccessService, client: mqtt.Client, mappings
         full_tag = tag_prefix + tag
         tag_value = data_service.ReadSingle(full_tag).Value.GetValue()
         topic = mappings[tag]
-        logger.debug(f"Publishing {full_tag}'s value of {tag_value} to topic {topic}")
+        logger.debug(f"Publishing {full_tag}'s value of {tag_value} to topic {topic} with QOS {qos}")
         try:
             client.publish(topic=topic, payload=tag_value, qos=qos, retain=retain, properties=None)
         except:
@@ -60,8 +61,7 @@ def on_log(client, userdata, level, buf):
 try:
     config_file = open('/etc/chatterbox/config.json')
 except:
-    print("ERROR: config.json not found.")
-    raise SystemExit
+    raise ValueError("config.json not found.")
 
 settings = json.load(config_file)
 
@@ -70,60 +70,46 @@ settings = json.load(config_file)
 # dictionary accesses rather than catching exceptions for missing values.
 plc_address = settings.get('plc_address', 'localhost')
 if not (broker_url := settings.get('broker_url', None)):
-    print("ERROR: broker_url not found in configuration file.")
-    raise SystemExit
+    raise ValueError("broker_url not found in configuration file.")
 if not (cert_file := settings.get('cert_file', None)):
-    print("ERROR: cert_file not found in configuration file.")
-    raise SystemExit
+    raise ValueError("cert_file not found in configuration file.")
 if not (key_file := settings.get('key_file', None)):
-    print("ERROR: key_file not found in configuration file.")
-    raise SystemExit
+    raise ValueError("key_file not found in configuration file.")
 key_file_password = settings.get('key_password', None)
 if not (ca_cert_file := settings.get('ca_cert_file', None)):
-    print("ERROR: ca_cert_file not found in configuration file.")
-    raise SystemExit
+    raise ValueError("ca_cert_file not found in configuration file.")
 if not (client_id := settings.get('client_id', None)):
-    print("ERROR: client_id not found in configuration file.")  
-    raise SystemExit
+    raise ValueError("client_id not found in configuration file.")
 if not (mqtt_username := settings.get('mqtt_username', None)):
-    print("ERROR: mqtt_username not found in configuration file.")  
-    raise SystemExit
+    raise ValueError("mqtt_username not found in configuration file.")  
 if not (mqtt_password := settings.get('mqtt_password', None)):
-    print("ERROR: mqtt_password not found in configuration file.")  
-    raise SystemExit
+    raise ValueError("mqtt_password not found in configuration file.")
 if not (plc_username := settings.get('plc_username', None)):
-    print("ERROR: plc_username not found in configuration file.")  
-    raise SystemExit
+    raise ValueError("plc_username not found in configuration file.") 
 if not (plc_password := settings.get('plc_password', None)):
-    print("ERROR: plc_password not found in configuration file.")  
-    raise SystemExit
+    raise ValueError("plc_password not found in configuration file.")
 if type(tag_prefix := settings.get('tag_prefix', 'Arp.Plc.Eclr/')) is not str:
-    print("ERROR: tag_prefix must be a string.")
-    raise SystemExit
+    raise ValueError("tag_prefix must be a string.")
 if not (mappings := settings.get('tag_topic_mappings', None)):
-    print("ERROR: tag_topic_mappings not found in configuration file.")  
-    raise SystemExit
+    raise ValueError("tag_topic_mappings not found in configuration file.")
 if type(mappings) is not dict:
-    print("ERROR: tag_topic_mappings is not a properly formatted dictionary.")
-    raise SystemExit
+    raise ValueError("tag_topic_mappings is not a properly formatted dictionary.")
 if type((time_between_publications := settings.get('seconds_between_publications', 10))) is not int:
-    print("ERROR: time_between_publications must be an integer.")  
-    raise SystemExit
+    raise ValueError("time_between_publications must be an integer.")
 log_file_name = settings.get('log_file', '/var/log/chatterbox.log')
 log_verbose: bool = settings.get('log_verbose', False)
 if (publish_qos := settings.get('publish_qos', 0)) not in [0, 1, 2]:
-    print("ERROR: publish_qos must be an integer. Possible options are 0, 1, and 2.")
-    raise SystemExit
+    raise ValueError("publish_qos must be an integer. Possible options are 0, 1, and 2.")
 retain_topics = settings.get('retain_topics', False)
 
 # Initialize logger
 logger = logging.getLogger(__name__)
 try:
     log_level = logging.DEBUG if log_verbose else logging.INFO
-    logging.basicConfig(filename=log_file_name, encoding='utf-8', level=log_level)
-except OSError:
-    print("ERROR: invalid log file. Make sure the specified directory exists and that you have permission to write to it.")
-    raise SystemExit
+    format = '%(asctime)s - %(name)s - %(levelname)s: %(message)s'
+    logging.basicConfig(filename=log_file_name, encoding='utf-8', level=log_level, format=format)
+except:
+    raise ValueError("invalid log file. Make sure the specified directory exists and that you have permission to write to it.")
 
 # Configuration finished.
 logging.info("chatterbox was started successfully.")
