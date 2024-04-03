@@ -58,8 +58,8 @@ def on_log(client, userdata, level, buf):
     
 # Read JSON configuration file
 try:
-    config_file = open('/opt/plcnext/chatterbox/config.json')
-except OSError:
+    config_file = open('/etc/chatterbox.d/config.json')
+except:
     print("ERROR: config.json not found.")
     raise SystemExit
 
@@ -124,6 +124,9 @@ try:
 except OSError:
     print("ERROR: invalid log file. Make sure the specified directory exists and that you have permission to write to it.")
     raise SystemExit
+
+# Configuration finished.
+logging.info("chatterbox was started successfully.")
 
 
 ####################################################
