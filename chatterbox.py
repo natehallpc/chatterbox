@@ -12,16 +12,17 @@ from PyPlcnextRsc.Arp.Plc.Gds.Services import IDataAccessService
 ####################################################
 
 # Uses the provided client to publish PLCnext tags to their respectively mapped MQTT topics
-def publish_tags(data_service: IDataAccessService, client: mqtt.Client, mappings: dict, qos: int, retain: bool):
+def publish_tags(data_service: IDataAccessService, client: mqtt.Client, mappings: dict, tag_prefix: str, qos: int, retain: bool):
     if not client.is_connected():
         return
     for tag in mappings:
-        tag_value = data_service.ReadSingle(tag).Value.GetValue()
+        full_tag = tag_prefix + tag
+        tag_value = data_service.ReadSingle(full_tag).Value.GetValue()
         topic = mappings[tag]
-        logger.debug(f"Publishing {tag}'s value of {tag_value} to topic {topic}")
+        logger.debug(f"Publishing {full_tag}'s value of {tag_value} to topic {topic}")
         try:
             client.publish(topic=topic, payload=tag_value, qos=qos, retain=retain, properties=None)
-        except ValueError:
+        except:
             logger.error(f"Could not publish tag. Ensure that the topic is valid and the tag value is less than 268435455 bytes.")
 
 # CALLBACK: Connected to broker
@@ -96,6 +97,9 @@ if not (plc_username := settings.get('plc_username', None)):
 if not (plc_password := settings.get('plc_password', None)):
     print("ERROR: plc_password not found in configuration file.")  
     raise SystemExit
+if type(tag_prefix := settings.get('tag_prefix', 'Arp.Plc.Eclr/')) is not str:
+    print("ERROR: tag_prefix must be a string.")
+    raise SystemExit
 if not (mappings := settings.get('tag_topic_mappings', None)):
     print("ERROR: tag_topic_mappings not found in configuration file.")  
     raise SystemExit
@@ -159,7 +163,7 @@ while True:
         with Device(plc_address, secureInfoSupplier=secureInfoSupplier) as device:
             data_access_service = IDataAccessService(device)
             while True:
-                publish_tags(data_service=data_access_service, client=mqtt_client, mappings=mappings, qos=publish_qos, retain=retain_topics)
+                publish_tags(data_service=data_access_service, client=mqtt_client, mappings=mappings, tag_prefix=tag_prefix, qos=publish_qos, retain=retain_topics)
                 time.sleep(time_between_publications)
     except Exception as e:
         logger.error(e)
