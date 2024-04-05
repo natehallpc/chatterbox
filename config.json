@@ -11,7 +11,10 @@
     "key_password": "key_file_password",
     "ca_cert_file": "/path/to/ca/cert/file",
     "tag_prefix": "Arp.Plc.Eclr/",
-    "tag_topic_mappings": {
+    "initialize_topic_values": {
+        "mqtt_topic_path": "value"
+    },
+    "publish_tags_to_topics": {
         "plcnext_tag_path": "mqtt_topic_path"
     },
     "seconds_between_publications": 10,

@@ -24,16 +24,30 @@ def publish_tags(data_service: IDataAccessService, client: mqtt.Client, mappings
         try:
             client.publish(topic=topic, payload=tag_value, qos=qos, retain=retain, properties=None)
         except:
-            logger.error(f"Could not publish tag. Ensure that the topic is valid and the tag value is less than 268435455 bytes.")
+            logger.error(f"Could not publish tag. Ensure that the topic is valid and the tag value is less than 268435455 bytes")
 
+# Uses the provided client to initialize specified topic values with QOS 2.
+def publish_initial_vals(client: mqtt.Client, mappings: dict):
+    for topic in mappings:
+        init_val = mappings[topic]
+        logger.debug(f"Initializing {topic} with value {init_val}")
+        try:
+            client.publish(topic=topic, payload=init_val, qos=2)
+        except:
+            logger.error(f"Failed to initialize topic {topic}")
+    
 # CALLBACK: Connected to broker
 def on_connect(client, userdata, flags, reason_code, properties):
     # reason_code takes the form of an MQTT-v5.0-specified name
     broker_url = client.host
     if client.is_connected():
-        logger.info(f"Successfully connected to {broker_url}.")
+        logger.info(f"Successfully connected to {broker_url}")
+        # Subscribe and publish LWT-type messages from connect callback to ensure consistency across disconnection events
+        global init_publishes
+        publish_initial_vals(client=client, mappings=init_publishes)
+        # Subscribe here
     else:
-        logger.error(f"Broker connection unsuccessful. Reason code: {reason_code}.")
+        logger.error(f"Broker connection unsuccessful. Reason code: {reason_code}")
 
 # CALLBACK: Connection timeout
 def on_connect_fail(client, userdata):
@@ -90,10 +104,17 @@ if not (plc_password := settings.get('plc_password', None)):
     raise ValueError("plc_password not found in configuration file.")
 if type(tag_prefix := settings.get('tag_prefix', 'Arp.Plc.Eclr/')) is not str:
     raise ValueError("tag_prefix must be a string.")
-if not (mappings := settings.get('tag_topic_mappings', None)):
-    raise ValueError("tag_topic_mappings not found in configuration file.")
-if type(mappings) is not dict:
-    raise ValueError("tag_topic_mappings is not a properly formatted dictionary.")
+
+
+init_publishes = settings.get('initialize_topic_values', None)
+if init_publishes is not None and type(init_publishes) is not dict:
+    raise ValueError("initialize_topic_values is not a properly formatted dictionary.")
+
+publish_mappings = settings.get('publish_tags_to_topics', None)
+if publish_mappings is not None and type(publish_mappings) is not dict:
+    raise ValueError("publish_tags_to_topics is not a properly formatted dictionary.")
+
+
 if type((time_between_publications := settings.get('seconds_between_publications', 10))) is not int:
     raise ValueError("time_between_publications must be an integer.")
 log_file_name = settings.get('log_file', '/var/log/chatterbox.log')
@@ -155,7 +176,7 @@ while True:
         with Device(plc_address, secureInfoSupplier=secureInfoSupplier) as device:
             data_access_service = IDataAccessService(device)
             while True:
-                publish_tags(data_service=data_access_service, client=mqtt_client, mappings=mappings, tag_prefix=tag_prefix, qos=publish_qos, retain=retain_topics)
+                publish_tags(data_service=data_access_service, client=mqtt_client, mappings=publish_mappings, tag_prefix=tag_prefix, qos=publish_qos, retain=retain_topics)
                 time.sleep(time_between_publications)
     except Exception as e:
         logger.error(e)
