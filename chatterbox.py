@@ -3,13 +3,12 @@ import json
 import ssl
 import time
 import logging
-import sys
-from PyPlcnextRsc import Device, GUISupplierExample, RscVariant, IecType
-from PyPlcnextRsc.Arp.Plc.Gds.Services import IDataAccessService
+from PyPlcnextRsc import Device, RscVariant, RscType, IecType
+from PyPlcnextRsc.Arp.Plc.Gds.Services import IDataAccessService, WriteItem
 
 
 ####################################################
-# Define helper functions & callbacks
+# Define helper functions
 ####################################################
 
 # Uses the provided client to publish PLCnext tags to their respectively mapped MQTT topics
@@ -100,6 +99,43 @@ def subscribe_topics(client: mqtt.Client):
         except:
             logger.error(f"Failed to subscribe to {topic}. Ensure that it is a valid topic name.")
 
+# Take in an MQTT payload (a byte string) and cast it to a Python variable
+# based on its IEC type, packaging into an RscVariant.
+def cast_bytes(bytestr: bytes, iec_type: IecType) -> RscVariant:
+    payload = bytestr.decode('utf-8')
+    payload_value = None
+    try:
+        match iec_type:
+            case IecType.Null:
+                return RscVariant(value=bytestr, rscType=iec_type)
+            case IecType.TIME | IecType.LTIME:
+                return RscVariant(value=payload, rscType=iec_type)
+            case IecType.LDATE | IecType.LDATE_AND_TIME | IecType.LTIME_OF_DAY:
+                return RscVariant(value=int(payload), rscType=iec_type)
+            case IecType.BOOL:
+                return RscVariant(value=(payload == 'True'), rscType=iec_type)
+            case IecType.STRING:
+                return RscVariant(value=payload, rscType=RscType.Utf8String)
+            case IecType.REAL | IecType.LREAL:
+                return RscVariant(value=float(payload), rscType=iec_type)
+            case IecType.BYTE | IecType.WORD | IecType.DWORD | IecType.LWORD:
+                return RscVariant(value=bytestr, rscType=iec_type)
+            case IecType.SINT | IecType.INT | IecType.DINT | IecType.LINT:
+                return RscVariant(value=int(payload), rscType=iec_type)
+            case IecType.USINT | IecType.UINT | IecType.UDINT | IecType.ULINT:
+                return RscVariant(value=int(payload), rscType=iec_type)
+            case _ :
+                logger.error(f"Cast failed due to invalid IEC type. Provided type: {iec_type}")
+                return RscVariant(value=None, rscType=iec_type)
+    except:
+        logger.error(f"Failed to cast payload {bytestr} to an RscVariant.")
+        return RscVariant(value=None, rscType=IecType.Null)
+
+
+####################################################
+# Define Paho MQTT client callbacks
+####################################################
+
 # CALLBACK: Connected to broker
 def on_connect(client, userdata, flags, reason_code, properties):
     # reason_code takes the form of an MQTT-v5.0-specified name
@@ -121,18 +157,24 @@ def on_disconnect(client, userdata, disconnect_flags, reason_code, properties):
     broker_url = client.host
     logger.error(f"The connection to {broker_url} was broken. Will now attempt to reconnect until successful.")
 
-
-# TODO: write new value to PLC
 # CALLBACK: Received update from broker on subscribed topic
 def on_message(client, userdata, message):
     topic = message.topic
     subscription_settings = userdata['subscribe_mappings'][topic]
     iec_type = subscription_settings['iec_type']
-    print(f"Subscribed topic {topic} was set to {message}")
+    new_val = cast_bytes(message.payload, iec_type)
+    logger.debug(f"Subscribed topic {topic} was set to {new_val.GetValue()}")
     corresponding_tag = subscription_settings.get('plcnext_tag_path', "")
     if not corresponding_tag:
         logger.error(f"Received an update from topic {message.topic}, which has no corresponding PLCnext variable.")
         return
+    tag_prefix = client.user_data_get()['tag_prefix']
+    var_name = tag_prefix + corresponding_tag
+    try:
+        data_access_service.WriteSingle(WriteItem(var_name, new_val))
+        logger.debug(f"Set variable {var_name} to {new_val}")
+    except Exception as e:
+        logger.error(e)
 
 # CALLBACK: Log information has become available
 def on_log(client, userdata, level, buf):
@@ -194,6 +236,9 @@ if (publish_qos := settings.get('publish_qos', 0)) not in [0, 1, 2]:
 if (subscribe_qos := settings.get('subscribe_qos', 0)) not in [0, 1, 2]:
     raise ValueError("subscribe_qos must be an integer. Possible options are 0, 1, and 2.")
 retain_topics = settings.get('retain_topics', False)
+
+# Validate and process subscription settings
+subscribe_mappings = fill_rsc_types(subscribe_mappings)
 
 # Initialize logger
 logger = logging.getLogger(__name__)
