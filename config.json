@@ -17,9 +17,13 @@
     "publish_tags_to_topics": {
         "plcnext_tag_path": "mqtt_topic_path"
     },
+    "subscribe_topics_to_tags": {
+        "mqtt_topic_path": "plcnext_tag_path"
+    },
     "seconds_between_publications": 10,
     "log_file": "/var/log/chatterbox.log",
     "log_verbose": false,
     "publish_qos": 0,
+    "subscribe_qos": 0,
     "retain_topics": false
 }
