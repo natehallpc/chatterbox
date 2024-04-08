@@ -27,6 +27,15 @@ retain_topics: false
 key_file_password: None
 ```
 
+### Publishing to MQTT topics
+
+
+
+### Subscribing to MQTT topics
+Refer to `config.json` to see how to configure subscriptions. This entails adding one nested JSON object to `subscribe_topics_to_tags` for each subscription. The object **must** contain the keys `plcnext_tag_path` and `iec_type`. Note that `tag_prefix` will be prepended to PLCnext tag paths. `iec_type` must be an [IEC 61131-3](https://en.wikipedia.org/wiki/IEC_61131-3)-defined type; visit [this link](https://pyplcnextrsc.readthedocs.io/en/latest/pages/framework_reference.html#PyPlcnextRsc.common.tag_type.IecType) for a list supported types.
+
+
+
 ## Installation
 
 In addition to the usual installation instructions, such as installing libraries; a few steps need to be taken in order to register this application as a service. Doing so ensures it will run when your controller powers on.

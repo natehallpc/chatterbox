@@ -4,7 +4,7 @@ import ssl
 import time
 import logging
 import sys
-from PyPlcnextRsc import Device, GUISupplierExample
+from PyPlcnextRsc import Device, GUISupplierExample, RscVariant, IecType
 from PyPlcnextRsc.Arp.Plc.Gds.Services import IDataAccessService
 
 
@@ -43,15 +43,57 @@ def publish_initial_vals(client: mqtt.Client):
         except:
             logger.error(f"Failed to initialize topic {topic}")
 
+# Used for subscribe_mappings. Validates iec_type of each PLCnext variable, and
+# replaces its string value with the corresponding RSC type. Returns an 
+# updated dictionary with misconfigured subscriptions removed.
+def fill_rsc_types(subscriptions: dict):
+    iec_types = {
+                'NULL': IecType.Null,
+                'TIME': IecType.TIME,
+                'LTIME': IecType.LTIME,
+                'LDATE': IecType.LDATE,
+                'LDATE_AND_TIME': IecType.LDATE_AND_TIME,
+                'LTIME_OF_DAY': IecType.LTIME_OF_DAY,
+                'BOOL': IecType.BOOL,
+                'STRING': IecType.STRING,
+                'LREAL': IecType.LREAL,
+                'REAL': IecType.REAL,
+                'LWORD': IecType.LWORD,
+                'DWORD': IecType.DWORD,
+                'WORD': IecType.WORD,
+                'BYTE': IecType.BYTE,
+                'LINT': IecType.LINT,
+                'DINT': IecType.DINT,
+                'INT': IecType.INT,
+                'SINT': IecType.SINT,
+                'ULINT': IecType.ULINT,
+                'UDINT': IecType.UDINT,
+                'UINT': IecType.UINT,
+                'USINT': IecType.USINT
+            }
+    updated_dict = dict()
+    for topic in subscriptions:
+        try:
+            subscription = subscriptions[topic]
+            datatype = subscription['iec_type'].upper()
+            iec_type = iec_types[datatype]
+            subscription.update({'iec_type': iec_type})
+            updated_dict.update({topic: subscription})
+        except:
+             logger.error(f"Invalid subscription settings to topic {topic}. The subscription will not be made.")
+    return updated_dict
+
 # Uses the provided client object to subscribe to topics needed to populate specified tags.
 def subscribe_topics(client: mqtt.Client):
-    mappings = client.user_data_get()['subscribe_mappings']
-    if mappings is None:
+    subscriptions = client.user_data_get()['subscribe_mappings']
+    if subscriptions is None:
+        logger.info("No subscriptions requested.")
         return
     tag_prefix = client.user_data_get()['tag_prefix']
     qos = client.user_data_get()['subscribe_qos']
-    for topic in mappings:
-        variable_name = tag_prefix + mappings[topic]
+    for topic in subscriptions:
+        subscription = subscriptions[topic]
+        variable_name = tag_prefix + subscription['plcnext_tag_path']
         try:
             logger.debug(f"Subscribing variable {variable_name} to topic {topic} with QOS {qos}")
             client.subscribe(topic=topic, qos=qos)
@@ -79,14 +121,18 @@ def on_disconnect(client, userdata, disconnect_flags, reason_code, properties):
     broker_url = client.host
     logger.error(f"The connection to {broker_url} was broken. Will now attempt to reconnect until successful.")
 
+
+# TODO: write new value to PLC
 # CALLBACK: Received update from broker on subscribed topic
 def on_message(client, userdata, message):
-    print(f"Subscribed topic {message.topic} was set to {message.payload.decode('utf-8')}")
-    corresponding_tag = userdata['subscribe_mappings'].get(message.topic, None)
+    topic = message.topic
+    subscription_settings = userdata['subscribe_mappings'][topic]
+    iec_type = subscription_settings['iec_type']
+    print(f"Subscribed topic {topic} was set to {message}")
+    corresponding_tag = subscription_settings.get('plcnext_tag_path', "")
     if not corresponding_tag:
         logger.error(f"Received an update from topic {message.topic}, which has no corresponding PLCnext variable.")
         return
-    
 
 # CALLBACK: Log information has become available
 def on_log(client, userdata, level, buf):
