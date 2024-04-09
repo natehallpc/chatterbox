@@ -13,13 +13,16 @@ from PyPlcnextRsc.Arp.Plc.Gds.Services import IDataAccessService, WriteItem
 
 # Uses the provided client to publish PLCnext tags to their respectively mapped MQTT topics
 def publish_tags(data_service: IDataAccessService, client: mqtt.Client):
-    mappings = client.user_data_get()['publish_mappings']
-    if not client.is_connected() or mappings is None:
+    # Ensure that client is connected and holds necessary settings before proceeding.
+    if (not client.is_connected()) or ((userdata := client.user_data_get()) is None):
         return
-    qos = client.user_data_get()['publish_qos']
-    retain = client.user_data_get()['retain_topics']
+    # Make sure that publishing has actually been requested
+    if (mappings := userdata['publish_mappings']) is None:
+        return
+    qos = userdata['publish_qos']
+    retain = userdata['retain_topics']
     for tag in mappings:
-        tag_prefix = client.user_data_get()['tag_prefix']
+        tag_prefix = userdata['tag_prefix']
         full_tag = tag_prefix + tag
         tag_value = data_service.ReadSingle(full_tag).Value.GetValue()
         topic = mappings[tag]
@@ -31,8 +34,8 @@ def publish_tags(data_service: IDataAccessService, client: mqtt.Client):
 
 # Uses the provided client to initialize specified topic values with QOS 2.
 def publish_initial_vals(client: mqtt.Client):
-    mappings = client.user_data_get()['init_publishes']
-    if mappings is None:
+    # Ensure that client is connected and holds necessary settings before proceeding.
+    if ((userdata := client.user_data_get()) is None) or ((mappings := userdata['init_publishes']) is None):
         return
     for topic in mappings:
         init_val = mappings[topic]
@@ -46,6 +49,9 @@ def publish_initial_vals(client: mqtt.Client):
 # replaces its string value with the corresponding RSC type. Returns an 
 # updated dictionary with misconfigured subscriptions removed.
 def fill_rsc_types(subscriptions: dict):
+    # Don't try to iterate over an empty set of keys
+    if not subscriptions:
+        return
     iec_types = {
                 'NULL': IecType.Null,
                 'TIME': IecType.TIME,
@@ -84,8 +90,10 @@ def fill_rsc_types(subscriptions: dict):
 
 # Uses the provided client object to subscribe to topics needed to populate specified tags.
 def subscribe_topics(client: mqtt.Client):
-    subscriptions = client.user_data_get()['subscribe_mappings']
-    if subscriptions is None:
+    if (userdata := client.user_data_get()) is None:
+        logger.error("Couldn't make subscriptions due to an unknown error.")
+        return
+    if (subscriptions := userdata['subscribe_mappings']) is None:
         logger.info("No subscriptions requested.")
         return
     tag_prefix = client.user_data_get()['tag_prefix']
@@ -103,7 +111,6 @@ def subscribe_topics(client: mqtt.Client):
 # based on its IEC type, packaging into an RscVariant.
 def cast_bytes(bytestr: bytes, iec_type: IecType) -> RscVariant:
     payload = bytestr.decode('utf-8')
-    payload_value = None
     try:
         match iec_type:
             case IecType.Null:
@@ -155,7 +162,7 @@ def on_connect_fail(client, userdata):
 # CALLBACK: Broker connection severed
 def on_disconnect(client, userdata, disconnect_flags, reason_code, properties):
     broker_url = client.host
-    logger.error(f"The connection to {broker_url} was broken. Will now attempt to reconnect until successful.")
+    logger.error(f"The connection to {broker_url} was broken with reason code {reason_code}. Will now attempt to reconnect until successful.")
 
 # CALLBACK: Received update from broker on subscribed topic
 def on_message(client, userdata, message):
@@ -250,7 +257,7 @@ except:
     raise ValueError("invalid log file. Make sure the specified directory exists and that you have permission to write to it.")
 
 # Configuration finished.
-logging.info("chatterbox was started successfully.")
+logger.info("chatterbox was started successfully.")
 
 
 ####################################################
@@ -277,7 +284,7 @@ try:
                                'retain_topics': retain_topics
                                })
 except Exception as e:
-    logging.error(e)
+    logger.error(e)
 
 # Attempt to connect to the broker. Any immediate errors, such as connection refused or
 # timed out, will be caught and logged. If the connection fails later, loop_start() 
@@ -299,11 +306,11 @@ mqtt_client.loop_start()
 secureInfoSupplier = lambda:(plc_username, plc_password)
 while True:
     try:
-
         with Device(plc_address, secureInfoSupplier=secureInfoSupplier) as device:
             data_access_service = IDataAccessService(device)
             while True:
-                publish_tags(data_service=data_access_service, client=mqtt_client)
+                if publish_mappings:
+                    publish_tags(data_service=data_access_service, client=mqtt_client)
                 time.sleep(time_between_publications)
     except Exception as e:
         logger.error(e)

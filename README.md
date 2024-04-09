@@ -13,7 +13,7 @@ Configuration instructions can be found below, and installation instructions are
 - Ensure that variables to be read from PLCnext are not declared with an appropriate usage scope. For example, variables with usage 'local' won't be accessible.
 - Settings are provided via the `config.json` file. The provided file is a template listing all possible arguments.
 - Arguments not listed in the template will be ignored.
-- All arguments in the template are required except  those specified in the defaults section below. If the key file is password protected and `key_file_password` is not provided, you will be promted to enter it on the command line.
+- All arguments in the template are required except those specified in the defaults section below. If the key file is password protected and `key_file_password` is not provided, you will be prompted to enter it on the command line.
 - Provided cron scripts are optional. I use them when installing this service in remote sites where it is very difficult to access PLCs for troubleshooting. Use as you wish, but I like to put `start-chatterbox` in `cron.hourly` and `restart-chatterbox` in `cron.daily`; ensuring the tool is down for no more than an hour and is fully reset daily. 
 
 ### Defaults
@@ -40,7 +40,7 @@ Refer to `config.json` to see how to configure subscriptions. This entails addin
 
 In addition to the usual installation instructions, such as installing libraries; a few steps need to be taken in order to register this application as a service. Doing so ensures it will run when your controller powers on.
 
-Before following these instructions, **be sure your PLCnext controller has internet access**. This will be necessary in general if your MQTT broker is not on a local subnet, but is also needed for the installation process. There are guides online which can guide you through this process; I won't provide any as it depends on your network and hardware. Best of luck!
+Before following these instructions, **be sure your PLCnext controller has internet access**. This will be necessary in general if your MQTT broker is not on a local subnet but is also needed for the installation process. There are guides online which can guide you through this process; I won't provide any as it depends on your network and hardware. Best of luck!
 
 ### Instructions
 

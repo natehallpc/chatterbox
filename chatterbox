@@ -6,10 +6,10 @@
 # Default-Stop:      0 1 6
 # Short-Description: run chatterbox daemon
 # Description:       chatterbox is a Python program that interconnects the PLCnext
-#                                        runtime environment with a remote MQTT broker.
+#                    runtime environment with a remote MQTT broker.
 ### END INIT INFO
 
-DIR=/etc/chatterbox.d
+DIR=/etc/chatterbox
 DAEMON=$DIR/chatterbox.py
 DAEMON_NAME=chatterbox
 DAEMON_OPTS=""
