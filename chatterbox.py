@@ -3,6 +3,7 @@ import json
 import ssl
 import time
 import logging
+import logging.handlers
 from PyPlcnextRsc import Device, RscVariant, RscType, IecType
 from PyPlcnextRsc.Arp.Plc.Gds.Services import IDataAccessService, WriteItem
 
@@ -10,6 +11,10 @@ from PyPlcnextRsc.Arp.Plc.Gds.Services import IDataAccessService, WriteItem
 ####################################################
 # Define helper functions
 ####################################################
+
+# Returns the current date and time in an abbreviated, log-friendly format.
+def time_str():
+    return time.strftime("%Y-%m-%d %H:%M", time.localtime())
 
 # Uses the provided client to publish PLCnext tags to their respectively mapped MQTT topics
 def publish_tags(data_service: IDataAccessService, client: mqtt.Client):
@@ -26,11 +31,11 @@ def publish_tags(data_service: IDataAccessService, client: mqtt.Client):
         full_tag = tag_prefix + tag
         tag_value = data_service.ReadSingle(full_tag).Value.GetValue()
         topic = mappings[tag]
-        logger.debug(f"Publishing {full_tag}'s value of {tag_value} to topic {topic} with QOS {qos}")
+        logger.debug(f"{time_str()} - Publishing {full_tag}'s value of {tag_value} to topic {topic} with QOS {qos}")
         try:
             client.publish(topic=topic, payload=tag_value, qos=qos, retain=retain, properties=None)
         except:
-            logger.error(f"Could not publish {tag}. Ensure that the topic ({topic}) is valid and the tag value ({tag_value}) is less than 268435455 bytes")
+            logger.error(f"{time_str()} - Could not publish {tag}. Ensure that the topic ({topic}) is valid and the tag value ({tag_value}) is less than 268435455 bytes")
 
 # Uses the provided client to initialize specified topic values with QOS 2.
 def publish_initial_vals(client: mqtt.Client):
@@ -39,11 +44,11 @@ def publish_initial_vals(client: mqtt.Client):
         return
     for topic in mappings:
         init_val = mappings[topic]
-        logger.debug(f"Initializing {topic} with value {init_val}")
+        logger.debug(f"{time_str()} - Initializing {topic} with value {init_val}")
         try:
             client.publish(topic=topic, payload=init_val, qos=2)
         except:
-            logger.error(f"Failed to initialize topic {topic}")
+            logger.error(f"{time_str()} - Failed to initialize topic {topic}")
 
 # Used for subscribe_mappings. Validates iec_type of each PLCnext variable, and
 # replaces its string value with the corresponding RSC type. Returns an 
@@ -85,16 +90,16 @@ def fill_rsc_types(subscriptions: dict):
             subscription.update({'iec_type': iec_type})
             updated_dict.update({topic: subscription})
         except:
-             logger.error(f"Invalid subscription settings to topic {topic}. The subscription will not be made.")
+             logger.error(f"{time_str()} - Invalid subscription settings to topic {topic}. The subscription will not be made.")
     return updated_dict
 
 # Uses the provided client object to subscribe to topics needed to populate specified tags.
 def subscribe_topics(client: mqtt.Client):
     if (userdata := client.user_data_get()) is None:
-        logger.error("Couldn't make subscriptions due to an unknown error.")
+        logger.error(f"{time_str()} - Couldn't make subscriptions due to an unknown error.")
         return
     if (subscriptions := userdata['subscribe_mappings']) is None:
-        logger.info("No subscriptions requested.")
+        logger.info(f"{time_str()} - No subscriptions requested.")
         return
     tag_prefix = client.user_data_get()['tag_prefix']
     qos = client.user_data_get()['subscribe_qos']
@@ -102,10 +107,10 @@ def subscribe_topics(client: mqtt.Client):
         subscription = subscriptions[topic]
         variable_name = tag_prefix + subscription['plcnext_tag_path']
         try:
-            logger.debug(f"Subscribing variable {variable_name} to topic {topic} with QOS {qos}")
+            logger.debug(f"{time_str()} - Subscribing variable {variable_name} to topic {topic} with QOS {qos}")
             client.subscribe(topic=topic, qos=qos)
         except:
-            logger.error(f"Failed to subscribe to {topic}. Ensure that it is a valid topic name.")
+            logger.error(f"{time_str()} - Failed to subscribe to {topic}. Ensure that it is a valid topic name.")
 
 # Take in an MQTT payload (a byte string) and cast it to a Python variable
 # based on its IEC type, packaging into an RscVariant.
@@ -132,10 +137,10 @@ def cast_bytes(bytestr: bytes, iec_type: IecType) -> RscVariant:
             case IecType.USINT | IecType.UINT | IecType.UDINT | IecType.ULINT:
                 return RscVariant(value=int(payload), rscType=iec_type)
             case _ :
-                logger.error(f"Cast failed due to invalid IEC type. Provided type: {iec_type}")
+                logger.error(f"{time_str()} - Cast failed due to invalid IEC type. Provided type: {iec_type}")
                 return RscVariant(value=None, rscType=iec_type)
     except:
-        logger.error(f"Failed to cast payload {bytestr} to an RscVariant.")
+        logger.error(f"{time_str()} - Failed to cast payload {bytestr} to an RscVariant.")
         return RscVariant(value=None, rscType=IecType.Null)
 
 
@@ -148,21 +153,21 @@ def on_connect(client, userdata, flags, reason_code, properties):
     # reason_code takes the form of an MQTT-v5.0-specified name
     broker_url = client.host
     if client.is_connected():
-        logger.info(f"Successfully connected to {broker_url}")
+        logger.info(f"{time_str()} - Successfully connected to {broker_url}")
         # Subscribe and publish LWT-type messages from connect callback to ensure consistency across disconnection events
         publish_initial_vals(client=client)
         subscribe_topics(client=client)
     else:
-        logger.error(f"Broker connection unsuccessful. Reason code: {reason_code}")
+        logger.error(f"{time_str()} - Broker connection unsuccessful. Reason code: {reason_code}")
 
 # CALLBACK: Connection timeout
 def on_connect_fail(client, userdata):
-    logger.error(f"Failed to connect to {broker_url}.")
+    logger.error(f"{time_str()} - Failed to connect to {broker_url}.")
 
 # CALLBACK: Broker connection severed
 def on_disconnect(client, userdata, disconnect_flags, reason_code, properties):
     broker_url = client.host
-    logger.error(f"The connection to {broker_url} was broken with reason code {reason_code}. Will now attempt to reconnect until successful.")
+    logger.error(f"{time_str()} - The connection to {broker_url} was broken with reason code {reason_code}. Will now attempt to reconnect until successful.")
 
 # CALLBACK: Received update from broker on subscribed topic
 def on_message(client, userdata, message):
@@ -170,18 +175,18 @@ def on_message(client, userdata, message):
     subscription_settings = userdata['subscribe_mappings'][topic]
     iec_type = subscription_settings['iec_type']
     new_val = cast_bytes(message.payload, iec_type)
-    logger.debug(f"Subscribed topic {topic} was set to {new_val.GetValue()}")
+    logger.debug(f"{time_str()} - Subscribed topic {topic} was set to {new_val.GetValue()}")
     corresponding_tag = subscription_settings.get('plcnext_tag_path', "")
     if not corresponding_tag:
-        logger.error(f"Received an update from topic {message.topic}, which has no corresponding PLCnext variable.")
+        logger.error(f"{time_str()} - Received an update from topic {message.topic}, which has no corresponding PLCnext variable.")
         return
     tag_prefix = client.user_data_get()['tag_prefix']
     var_name = tag_prefix + corresponding_tag
     try:
         data_access_service.WriteSingle(WriteItem(var_name, new_val))
-        logger.debug(f"Set variable {var_name} to {new_val}")
+        logger.debug(f"{time_str()} - Set variable {var_name} to {new_val}")
     except Exception as e:
-        logger.error(e)
+        logger.error(f"{time_str()} - {e}")
 
 # CALLBACK: Log information has become available
 def on_log(client, userdata, level, buf):
@@ -250,14 +255,15 @@ subscribe_mappings = fill_rsc_types(subscribe_mappings)
 # Initialize logger
 logger = logging.getLogger(__name__)
 try:
-    log_level = logging.DEBUG if log_verbose else logging.INFO
-    format = '%(asctime)s - %(name)s - %(levelname)s: %(message)s'
-    logging.basicConfig(filename=log_file_name, encoding='utf-8', level=log_level, format=format)
+    logger.setLevel(logging.DEBUG if log_verbose else logging.INFO)
+    # Limit log file size to 1MB, rotate 5 backups.
+    log_size_handler = logging.handlers.RotatingFileHandler(log_file_name, maxBytes=1000000, backupCount=5)
+    logger.addHandler(log_size_handler)
 except:
     raise ValueError("invalid log file. Make sure the specified directory exists and that you have permission to write to it.")
 
 # Configuration finished.
-logger.info("chatterbox was started successfully.")
+logger.info(f"{time_str()} - chatterbox was started successfully.")
 
 
 ####################################################
@@ -284,18 +290,18 @@ try:
                                'retain_topics': retain_topics
                                })
 except Exception as e:
-    logger.error(e)
+    logger.error(f"{time_str()} - {e}")
 
 # Attempt to connect to the broker. Any immediate errors, such as connection refused or
 # timed out, will be caught and logged. If the connection fails later, loop_start() 
 # ensures the connection will be reattempted until successful. If the connection is lost
 # later, it will be reestablished automatically.
 try:
-    logger.info(f"Attempting to connect to {broker_url}")
+    logger.info(f"{time_str()} - Attempting to connect to {broker_url}")
     mqtt_client.connect(host=broker_url, port=8883)
 except Exception as e:
-    logger.error(e)
-    logger.info("Connection failed due to the above error. Waiting 60s to try again.")
+    logger.error(f"{time_str()} - {e}")
+    logger.info(f"{time_str()} - Connection failed due to the above error. Waiting 60s to try again.")
 mqtt_client.loop_start()
 
 
@@ -313,5 +319,5 @@ while True:
                     publish_tags(data_service=data_access_service, client=mqtt_client)
                 time.sleep(time_between_publications)
     except Exception as e:
-        logger.error(e)
+        logger.error(f"{time_str()} - {e}")
         time.sleep(20)
