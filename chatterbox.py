@@ -5,7 +5,7 @@ import time
 import logging
 import logging.handlers
 from PyPlcnextRsc import Device, RscVariant, RscType, IecType
-from PyPlcnextRsc.Arp.Plc.Gds.Services import IDataAccessService, WriteItem
+from PyPlcnextRsc.Arp.Plc.Gds.Services import IDataAccessService, WriteItem, ReadItem, DataAccessError
 
 
 ####################################################
@@ -26,16 +26,28 @@ def publish_tags(data_service: IDataAccessService, client: mqtt.Client):
         return
     qos = userdata['publish_qos']
     retain = userdata['retain_topics']
-    for tag in mappings:
-        tag_prefix = userdata['tag_prefix']
-        full_tag = tag_prefix + tag
-        tag_value = data_service.ReadSingle(full_tag).Value.GetValue()
-        topic = mappings[tag]
-        logger.debug(f"{time_str()} - Publishing {full_tag}'s value of {tag_value} to topic {topic} with QOS {qos}")
+    tag_prefix = userdata['tag_prefix']
+    try:
+        var_names = list(mappings.keys())
+        var_names_full = [tag_prefix + var for var in var_names]
+        read_items = data_access_service.Read(var_names_full)
+    except Exception:
+        logger.error("There was an error reading variables from the controller.")
+    read_index = 0
+    for var in var_names:
+        topic = mappings[var]
+        tag_item = read_items[read_index]
+        if tag_item.Error != DataAccessError.NONE:
+            logger.error(f"Unable to read the value of {var} from the controller. Error code: {tag_item.Error}")
+            read_index += 1
+            continue
+        tag_value = tag_item.Value.GetValue()
+        logger.debug(f"{time_str()} - Publishing {var}'s value of {tag_value} to topic {topic} with QOS {qos}")
         try:
             client.publish(topic=topic, payload=tag_value, qos=qos, retain=retain, properties=None)
         except:
-            logger.error(f"{time_str()} - Could not publish {tag}. Ensure that the topic ({topic}) is valid and the tag value ({tag_value}) is less than 268435455 bytes")
+            logger.error(f"{time_str()} - Could not publish {var}. Ensure that the topic ({topic}) is valid and the tag value ({tag_value}) is less than 268435455 bytes")
+        read_index += 1
 
 # Uses the provided client to initialize specified topic values with QOS 2.
 def publish_initial_vals(client: mqtt.Client):
