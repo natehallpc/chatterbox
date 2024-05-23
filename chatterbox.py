@@ -42,6 +42,8 @@ def publish_tags(data_service: IDataAccessService, client: mqtt.Client):
             read_index += 1
             continue
         tag_value = tag_item.Value.GetValue()
+        if type(tag_value) is bool:
+            tag_value = "true" if tag_value else "false"
         logger.debug(f"{time_str()} - Publishing {var}'s value of {tag_value} to topic {topic} with QOS {qos}")
         try:
             client.publish(topic=topic, payload=tag_value, qos=qos, retain=retain, properties=None)
